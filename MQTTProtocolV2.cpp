@@ -109,43 +109,78 @@ int8_t MQTTProtocolV2::getResult(eAlgorithm_t algo) {
   return false;
 }
 uint8_t MQTTProtocolV2::learn(eAlgorithm_t algo) {
+  bool ret = false;
   log_i("%s(): %d", __func__, __LINE__);
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject &root = jsonBuffer.createObject();
-  root["cmd"] = "learn";
-  root["peer"] = "arduino";
-  root["algorithm"] = (uint8_t)algo;
-  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
-  String jsonStr;
-  root.printTo(jsonStr);
-  bool ret = sendAndWait(jsonStr);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "learn";
+    root["peer"] = "arduino";
+    root["algorithm"] = (uint8_t)algo;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+  }
   log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
   if (!ret) {
-    return false;
+    return 0;
   }
-  return isResponseSuccess(responsePayload);
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return 0;
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return 0;
+  }
+  return resp["id"].as<uint8_t>();
 }
 uint8_t MQTTProtocolV2::learnBlock(eAlgorithm_t algo, int16_t x, int16_t y,
                                    int16_t width, int16_t height) {
+  bool ret = false;
   log_i("%s(): %d", __func__, __LINE__);
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject &root = jsonBuffer.createObject();
-  root["cmd"] = "learn_block";
-  root["peer"] = "arduino";
-  root["algorithm"] = (uint8_t)algo;
-  root["x"] = x;
-  root["y"] = y;
-  root["width"] = width;
-  root["height"] = height;
-  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
-  String jsonStr;
-  root.printTo(jsonStr);
-  bool ret = sendAndWait(jsonStr);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "learn_block";
+    root["peer"] = "arduino";
+    root["algorithm"] = (uint8_t)algo;
+    root["x"] = x;
+    root["y"] = y;
+    root["width"] = width;
+    root["height"] = height;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+  }
+
   log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
   if (!ret) {
     return false;
   }
-  return isResponseSuccess(responsePayload);
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return 0;
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return 0;
+  }
+  return resp["id"].as<uint8_t>();
 }
 bool MQTTProtocolV2::forget(eAlgorithm_t algo) {
   log_i("%s(): %d", __func__, __LINE__);

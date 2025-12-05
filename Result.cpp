@@ -178,10 +178,10 @@ uint8_t customAlgoNum;
 int16_t maxID[ALGORITHM_BUILTIN_COUNT];
 
 eAlgorithm_t toRealID(uint8_t id) {
-  eAlgorithm_t algo = ALGORITHM_ANY;
+  eAlgorithm_t algo = (eAlgorithm_t)id;
   if (id >= ALGORITHM_CUSTOM_BEGIN) {
     for (uint8_t i = 0; i < CUSTOM_ALGORITHM_COUNT; i++)
-      if (customId[i] == algo) {
+      if (customId[i] == id) {
         algo = (eAlgorithm_t)((int)ALGORITHM_CUSTOM0 + i);
         break;
       }
