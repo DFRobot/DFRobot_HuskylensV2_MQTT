@@ -61,6 +61,8 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   huskylens.begin("192.168.2.102", 1883, "huskylens", "dfrobot");
+  huskylens.switchAlgorithm(ALGORITHM_FACE_RECOGNITION);
+  delay(5000);
 }
 void loop() {
   while (!huskylens.getResult(ALGORITHM_FACE_RECOGNITION)) {
