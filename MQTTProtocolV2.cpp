@@ -350,7 +350,7 @@ bool MQTTProtocolV2::saveKnowledges(eAlgorithm_t algo, uint8_t knowledgeID) {
   root["cmd"] = "save_knowledges";
   root["peer"] = "arduino";
   root["algorithm"] = (uint8_t)algo;
-  root["knowledge_id"] = knowledgeID;
+  root["knowledges_id"] = knowledgeID;
   root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
 
   String jsonStr;
@@ -370,7 +370,7 @@ bool MQTTProtocolV2::loadKnowledges(eAlgorithm_t algo, uint8_t knowledgeID) {
   root["cmd"] = "load_knowledges";
   root["peer"] = "arduino";
   root["algorithm"] = (uint8_t)algo;
-  root["knowledge_id"] = knowledgeID;
+  root["knowledges_id"] = knowledgeID;
   root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
 
   String jsonStr;
