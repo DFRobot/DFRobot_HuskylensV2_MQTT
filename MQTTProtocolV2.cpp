@@ -90,6 +90,7 @@ int8_t MQTTProtocolV2::getResult(eAlgorithm_t algo) {
     const char *cmd = resp["cmd"];
     log_i("cmd: %s", cmd);
     if (strcmp(pret, "success") == 0) {
+      maxID[(int)algo] = resp["max_id"];
       JsonArray &results = resp["results"];
       for (uint8_t i = 0; i < results.size(); i++) {
         JsonObject &item = results[i];

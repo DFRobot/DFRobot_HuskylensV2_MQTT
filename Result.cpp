@@ -3,8 +3,6 @@
 Result::Result(JsonObject &obj) {
   if (obj.containsKey("id")) {
     ID = obj["id"];
-  } else if (obj.containsKey("maxID")) {
-    maxID = obj["maxID"];
   } else if (obj.containsKey("resolution")) {
     resolution = obj["resolution"];
   } else if (obj.containsKey("boardType")) {

@@ -33,13 +33,17 @@ void setup() {
 }
 
 void loop() {
-  while (!huskylens.getResult(ALGORITHM_ANY)) {
+  while (!huskylens.getResult(ALGORITHM_FACE_RECOGNITION)) {
     delay(100);
   }
 
-  while (huskylens.available(ALGORITHM_ANY)) {
-    Result *result =
-        static_cast<Result *>(huskylens.popCachedResult(ALGORITHM_ANY));
+  int16_t maxID = huskylens.getCachedResultMaxID(ALGORITHM_FACE_RECOGNITION);
+  Serial.print("result->maxID=");
+  Serial.println(maxID);
+
+  while (huskylens.available(ALGORITHM_FACE_RECOGNITION)) {
+    Result *result = static_cast<Result *>(
+        huskylens.popCachedResult(ALGORITHM_FACE_RECOGNITION));
 
     Serial.print("result->ID=");
     Serial.println(result->ID);
