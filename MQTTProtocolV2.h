@@ -63,6 +63,12 @@ public:
   bool stopRecording(eMediaType_t mediaType);
   bool sendAndWait(String &command);
 
+  bool e2eStartRecording(void);
+  bool e2eStopRecording(void);
+  bool e2eSendAnnotation(String annotation);
+
+
+
 private:
   bool getAlgoParam(eAlgorithm_t algo, JsonObject *&outParams,
                     DynamicJsonBuffer &buffer);

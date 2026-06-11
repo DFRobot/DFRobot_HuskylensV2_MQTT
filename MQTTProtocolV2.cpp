@@ -752,6 +752,65 @@ bool MQTTProtocolV2::isResponseSuccess(String &respStr) {
   return true;
 }
 
+bool MQTTProtocolV2::e2eStartRecording(void) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_start_recording";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::e2eStopRecording(void) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_stop_recording";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::e2eSendAnnotation(String annotation) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_send_annotation";
+  root["peer"] = "arduino";
+  root["data"] = annotation;
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+
 void onMqttConnect(esp_mqtt_client_handle_t client) {
   log_i("%s(): %d", __func__, __LINE__);
   if (mqttClient.isMyTurn(client)) // can be omitted if only one client
