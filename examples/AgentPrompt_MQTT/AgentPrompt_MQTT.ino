@@ -70,6 +70,7 @@ static bool runAgentRound(const String &prompt) {
       Serial.println(agentStatusStr(status));
     } else {
       Serial.println(F("agent status: <query failed>"));
+      return false;
     }
     if (millis() - start > AGENT_POLL_TIMEOUT_MS) {
       Serial.println("[AgentPrompt] Poll timeout, give up");
