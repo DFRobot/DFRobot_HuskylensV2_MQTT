@@ -61,6 +61,13 @@ public:
                       String filename = "",
                       eResolution_t resolution = RESOLUTION_DEFAULT);
   bool stopRecording(eMediaType_t mediaType);
+
+  bool sendAgentPrompt(const String &prompt,
+                       eAgentType_t agentType = eXIAOZHI_AGENT);
+  String getAgentResponse(eAgentType_t agentType = eXIAOZHI_AGENT);
+  eAgentStatus_t getAgentStatus(eAgentType_t agentType = eXIAOZHI_AGENT);
+  bool isAgentResponseReady(eAgentType_t agentType = eXIAOZHI_AGENT);
+
   bool sendAndWait(String &command);
 
 private:

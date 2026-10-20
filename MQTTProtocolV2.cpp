@@ -43,7 +43,8 @@ void gbegin(String _host, uint16_t _port, String _username, String _password) {
   log_i("%s(): %d host: %s, port: %d, username: %s, password: %s", __func__,
         __LINE__, host.c_str(), port, username.c_str(), password.c_str());
   mqttClient.enableDebuggingMessages();
-  mqttClient.setMaxPacketSize(4096);
+  // agent 的 prompt/回答不分片，单条消息可能超过 4KB
+  mqttClient.setMaxPacketSize(8192);
   mqttClient.setURI(server.c_str(), username.c_str(), password.c_str());
   mqttClient.enableLastWillMessage("lwt", "I am going offline");
   mqttClient.setKeepAlive(30);
@@ -657,6 +658,155 @@ bool MQTTProtocolV2::stopRecording(eMediaType_t mediaType) {
     return false;
   }
   return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::sendAgentPrompt(const String &prompt,
+                                     eAgentType_t agentType) {
+  log_i("%s(): %d", __func__, __LINE__);
+  if (prompt.length() == 0) {
+    log_e("missing prompt");
+    return false;
+  }
+  if (prompt.length() > 4096) {
+    log_e("prompt too large: %d bytes", prompt.length());
+    return false;
+  }
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "send_agent_prompt";
+  root["peer"] = "arduino";
+  root["agent_type"] = (uint8_t)agentType;
+  root["prompt"] = prompt;
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+eAgentStatus_t MQTTProtocolV2::getAgentStatus(eAgentType_t agentType) {
+  bool ret = false;
+  log_i("%s(): %d", __func__, __LINE__);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "get_agent_status";
+    root["peer"] = "arduino";
+    root["agent_type"] = (uint8_t)agentType;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+    log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  }
+  if (!ret) {
+    return AGENT_QUERY_FAILED;
+  }
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return AGENT_QUERY_FAILED;
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return AGENT_QUERY_FAILED;
+  }
+
+  String state = resp["state"].as<String>();
+  if (state.equals("processing")) {
+    return AGENT_PROCESSING;
+  } else if (state.equals("broadcasting")) {
+    return AGENT_BROADCASTING;
+  } else if (state.equals("disabled")) {
+    return AGENT_DISABLED;
+  } else if (!state.equals("idle")) {
+    log_w("unknown agent state: %s", state.c_str());
+  }
+  return AGENT_IDLE;
+}
+
+bool MQTTProtocolV2::isAgentResponseReady(eAgentType_t agentType) {
+  bool ret = false;
+  log_i("%s(): %d", __func__, __LINE__);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "is_agent_response_ready";
+    root["peer"] = "arduino";
+    root["agent_type"] = (uint8_t)agentType;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+    log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  }
+  if (!ret) {
+    return false;
+  }
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return false;
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return false;
+  }
+  return resp["ready"].as<bool>();
+}
+
+String MQTTProtocolV2::getAgentResponse(eAgentType_t agentType) {
+  bool ret = false;
+  log_i("%s(): %d", __func__, __LINE__);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "get_agent_response";
+    root["peer"] = "arduino";
+    root["agent_type"] = (uint8_t)agentType;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+    log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  }
+  if (!ret) {
+    return "";
+  }
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return "";
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return "";
+  }
+  return resp["response"].as<String>();
 }
 
 String MQTTProtocolV2::takePhoto(eResolution_t resolution) {

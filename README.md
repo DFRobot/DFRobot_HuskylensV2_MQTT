@@ -263,6 +263,47 @@ bool setMultiAlgorithm(eAlgorithm_t algo0, eAlgorithm_t algo1, eAlgorithm_t algo
 bool setMultiAlgorithmRatio(uint8_t ratio0, uint8_t ratio1, uint8_t ratio2 = 0);
 ```
 
+### Agent Interaction Methods
+
+Chat with the xiaozhi agent running on HuskyLens V2 over MQTT. Unlike the UART version, prompts and responses are not fragmented: each is transferred in a single MQTT message (requests are published to topic `usr/cmd`, responses are received on topic `usr/response`).
+
+Suggested flow: call `sendAgentPrompt`, poll `isAgentResponseReady` (or `getAgentStatus`) until the answer is ready, then fetch it with `getAgentResponse`. See `examples/AgentPrompt_MQTT` for a complete example.
+
+```cpp
+/**
+ * @fn sendAgentPrompt
+ * @brief Send a text prompt to the agent; success means the prompt was submitted and the agent started processing (does not wait for the answer)
+ * @param prompt The prompt text, must be non-empty and no larger than 4096 bytes
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return true if the prompt was accepted, false otherwise
+ */
+bool sendAgentPrompt(const String &prompt, eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn isAgentResponseReady
+ * @brief Check whether the agent has a complete answer ready to fetch
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return true if a complete answer is ready, false otherwise
+ */
+bool isAgentResponseReady(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentStatus
+ * @brief Get the current agent status
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return AGENT_IDLE, AGENT_PROCESSING, AGENT_BROADCASTING or AGENT_DISABLED; AGENT_QUERY_FAILED on communication error
+ */
+eAgentStatus_t getAgentStatus(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentResponse
+ * @brief Fetch the complete answer (returned in one message, no fragmentation)
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return The full response text, or an empty string on failure
+ */
+String getAgentResponse(eAgentType_t agentType = eXIAOZHI_AGENT);
+```
+
 ## Algorithm
 
 HuskyLens V2 incorporates multiple algorithms, each yielding distinct elements within the result.

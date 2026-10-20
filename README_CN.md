@@ -262,6 +262,47 @@ bool setMultiAlgorithm(eAlgorithm_t algo0, eAlgorithm_t algo1, eAlgorithm_t algo
 bool setMultiAlgorithm(eAlgorithm_t algo0, eAlgorithm_t algo1, eAlgorithm_t algo2 = ALGORITHM_ANY);
 ```
 
+### Agent 交互方法
+
+通过 MQTT 与二哈识图V2上运行的小智 agent 对话。与 UART 版本不同，prompt 和回答都不需要分片：每条内容都通过单条 MQTT 消息传输（请求发布到主题 `usr/cmd`，响应从主题 `usr/response` 接收）。
+
+建议的交互流程：调用 `sendAgentPrompt` 提交 prompt，轮询 `isAgentResponseReady`（或 `getAgentStatus`）直到回答就绪，最后用 `getAgentResponse` 取回完整回答。完整示例见 `examples/AgentPrompt_MQTT`。
+
+```cpp
+/**
+ * @fn sendAgentPrompt
+ * @brief 向 agent 发送文本 prompt；返回成功表示 prompt 已提交、agent 开始处理（不等待回答生成）
+ * @param prompt prompt 文本，非空，最大 4096 字节
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return prompt 被接受返回true，否则返回false
+ */
+bool sendAgentPrompt(const String &prompt, eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn isAgentResponseReady
+ * @brief 查询 agent 是否有完整回答可以取回
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return 有完整回答返回true，否则返回false
+ */
+bool isAgentResponseReady(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentStatus
+ * @brief 获取 agent 当前状态
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return AGENT_IDLE、AGENT_PROCESSING、AGENT_BROADCASTING 或 AGENT_DISABLED；通信失败返回 AGENT_QUERY_FAILED
+ */
+eAgentStatus_t getAgentStatus(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentResponse
+ * @brief 取回完整回答（单条消息返回，无分片）
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return 完整回答文本，失败返回空字符串
+ */
+String getAgentResponse(eAgentType_t agentType = eXIAOZHI_AGENT);
+```
+
 ## 算法
 
 二哈识图V2包含多种算法，每种算法在结果中产生不同的元素。

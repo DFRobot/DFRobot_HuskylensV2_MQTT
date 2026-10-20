@@ -189,6 +189,18 @@ typedef enum ResultType {
   Result_Unknown
 } eResultType_t;
 
+typedef enum AgentType {
+  eXIAOZHI_AGENT = 0x0
+} eAgentType_t;
+
+typedef enum AgentStatus {
+  AGENT_QUERY_FAILED = -1,
+  AGENT_IDLE = 0x0,
+  AGENT_PROCESSING = 0x1,
+  AGENT_BROADCASTING = 0x2,
+  AGENT_DISABLED = 0x3, // 小智开关未打开
+} eAgentStatus_t;
+
 typedef struct __attribute__((packed)) {
   uint8_t head55;
   uint8_t headaa;
