@@ -68,6 +68,9 @@ public:
   eAgentStatus_t getAgentStatus(eAgentType_t agentType = eXIAOZHI_AGENT);
   bool isAgentResponseReady(eAgentType_t agentType = eXIAOZHI_AGENT);
 
+  AgentPromptLengthInfo_t checkAgentPromptLength(const String &prompt);
+  bool canSendAgentPrompt(const String &prompt);
+
   bool sendAndWait(String &command);
 
 private:

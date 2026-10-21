@@ -201,6 +201,26 @@ typedef enum AgentStatus {
   AGENT_DISABLED = 0x3, // 小智开关未打开
 } eAgentStatus_t;
 
+typedef enum AgentPromptCheck {
+  AGENT_PROMPT_OK = 0,   // 校验通过，可发送
+  AGENT_PROMPT_TOO_LONG, // 超出小智 listen/detect 长度限制，禁止发送
+} eAgentPromptCheck_t;
+
+// 小智 listen/detect 文本长度校验结果（v5 实测标定模型，与
+// DFRobot_HuskylensV2 库的 XiaozhiTextCheck 行为一致）
+typedef struct {
+  eAgentPromptCheck_t result;
+  int zhEff;    // 汉字类等效数：ceil(汉字类 + 1.5×重型非ASCII)
+  int enEff;    // ASCII 等效数：字母空格 + ceil(数字×1.125) + 3×句号 + 5×标点
+  int hanzi;    // 汉字类原始个数（汉字/假名/中文标点）
+  int heavy;    // 重型非ASCII个数（emoji/全角/韩文/俄文等）
+  int letter;   // ASCII 字母+空格
+  int digit;    // ASCII 数字
+  int period;   // ASCII 句号 '.'
+  int punct;    // 其他 ASCII 标点
+  int cjkPunct; // 其中中文标点的个数
+} AgentPromptLengthInfo_t;
+
 typedef struct __attribute__((packed)) {
   uint8_t head55;
   uint8_t headaa;

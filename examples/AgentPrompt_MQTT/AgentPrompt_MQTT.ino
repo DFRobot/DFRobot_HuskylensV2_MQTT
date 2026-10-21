@@ -19,8 +19,9 @@
 #include <DFRobot_HuskylensV2_MQTT.h>
 #include <WiFi.h>
 
-const char *ssid = "your_ssid";
-const char *pass = "your_password";
+const char *SSID = "your_ssid";
+const char *PASSWD = "your_password";
+const char *HUSKY_IP = "your_husky_ip";
 
 HuskylensV2_MQTT huskylens;
 
@@ -91,7 +92,7 @@ static bool runAgentRound(const String &prompt) {
 void setup() {
   Serial.begin(115200);
 
-  WiFi.begin(ssid, pass);
+  WiFi.begin(SSID, PASSWD);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -101,7 +102,7 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  while (!huskylens.begin("192.168.2.102", 1883, "huskylens", "dfrobot")) {
+  while (!huskylens.begin(HUSKY_IP, 1883, "huskylens", "dfrobot")) {
     Serial.println("Begin failed! Please recheck the MQTT broker address.");
     delay(1000);
   }

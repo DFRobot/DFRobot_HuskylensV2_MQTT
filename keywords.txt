@@ -14,6 +14,8 @@ eBoardType_t	KEYWORD1
 eResultType_t	KEYWORD1
 eAgentType_t	KEYWORD1
 eAgentStatus_t	KEYWORD1
+eAgentPromptCheck_t	KEYWORD1
+AgentPromptLengthInfo_t	KEYWORD1
 
 ###########################################
 # Methods and Functions (KEYWORD2)
@@ -55,6 +57,8 @@ sendAgentPrompt	KEYWORD2
 getAgentResponse	KEYWORD2
 getAgentStatus	KEYWORD2
 isAgentResponseReady	KEYWORD2
+checkAgentPromptLength	KEYWORD2
+canSendAgentPrompt	KEYWORD2
 toRealID	KEYWORD2
 protocolWrite	KEYWORD2
 timerBegin	KEYWORD2
@@ -119,6 +123,8 @@ AGENT_IDLE	LITERAL1
 AGENT_PROCESSING	LITERAL1
 AGENT_BROADCASTING	LITERAL1
 AGENT_DISABLED	LITERAL1
+AGENT_PROMPT_OK	LITERAL1
+AGENT_PROMPT_TOO_LONG	LITERAL1
 
 # 命令常量
 COMMAND_KNOCK	LITERAL1

@@ -1,5 +1,6 @@
 #include "MQTTProtocolV2.h"
 #include "esp_idf_version.h" // check IDF version
+#include <XiaozhiTextCheck.h>
 #include <map>
 String server = "mqtt://192.168.2.102:1883";
 
@@ -660,6 +661,27 @@ bool MQTTProtocolV2::stopRecording(eMediaType_t mediaType) {
   return isResponseSuccess(responsePayload);
 }
 
+// 小智平台 listen/detect 文本长度校验（2026-10-20 约 300 组实测标定的
+// v5 模型，与 DFRobot_HuskylensV2 库行为一致）：先按 UTF-8 码点分类
+// （汉字类/重型非ASCII/字母空格/数字/句号/其他标点），再按加权等效数
+// （zh_eff = ceil(汉字类 + 1.5×重型), en_eff = 字母 + ceil(数字×1.125)
+// + 3×句号 + 5×标点）和混合预算表判定。宁可误拒，绝不误放。
+AgentPromptLengthInfo_t MQTTProtocolV2::checkAgentPromptLength(
+    const String &prompt) {
+  xiaozhi::MeasureResult m =
+      xiaozhi::measure(prompt.c_str(), prompt.length());
+  AgentPromptLengthInfo_t info = {xiaozhi::can_send(m) ? AGENT_PROMPT_OK
+                                                       : AGENT_PROMPT_TOO_LONG,
+                                  m.zh_eff, m.en_eff, m.hanzi,  m.heavy,
+                                  m.letter, m.digit,  m.period, m.punct,
+                                  m.cjk_punct};
+  return info;
+}
+
+bool MQTTProtocolV2::canSendAgentPrompt(const String &prompt) {
+  return xiaozhi::can_send(prompt.c_str(), prompt.length());
+}
+
 bool MQTTProtocolV2::sendAgentPrompt(const String &prompt,
                                      eAgentType_t agentType) {
   log_i("%s(): %d", __func__, __LINE__);
@@ -669,6 +691,13 @@ bool MQTTProtocolV2::sendAgentPrompt(const String &prompt,
   }
   if (prompt.length() > 4096) {
     log_e("prompt too large: %d bytes", prompt.length());
+    return false;
+  }
+  // 仅小智平台有 listen/detect 长度限制, 发送前校验文本,
+  // 超限直接拒绝, 避免平台告警或静默丢弃(宁可误拒, 绝不误放)
+  if (eXIAOZHI_AGENT == agentType &&
+      !xiaozhi::can_send(prompt.c_str(), prompt.length())) {
+    log_e("prompt exceeds xiaozhi listen/detect length limit, rejected");
     return false;
   }
   DynamicJsonBuffer jsonBuffer;
