@@ -170,6 +170,10 @@ typedef enum {
 
 } eAlgorithm_t;
 
+// 自动驾驶内置模型，保留原预留枚举名称以兼容已有代码。
+#define ALGORITHM_AUTO_DRIVE_SMART_TRAFFIC ALGORITHM_RFU1
+#define ALGORITHM_AUTO_DRIVE_CITY_ROADS ALGORITHM_RFU2
+
 #ifdef LARGE_MEMORY
 #define ALGORITHM_COUNT ALGORITHM_BUILTIN_COUNT
 #define CUSTOM_ALGORITHM_COUNT 3
@@ -291,12 +295,14 @@ typedef struct __attribute__((packed)) {
     int16_t azimuth;
     int16_t total_blocks;
     int16_t roll; // eular[2], 沿X轴移动， 横滚角,前后移动
+    int16_t steering; // 转向
   };
   union {
     int16_t fourth;
     int16_t height;
     int16_t length;
     int16_t total_blocks_learned;
+    int16_t throttle; // 油门
   };
   int8_t payload[0];
 } PacketData_t;

@@ -49,7 +49,9 @@ Result::Result(JsonObject &obj) {
     yaw = obj["yaw"];
   }
 
-  if (obj.containsKey("width")) {
+  if (obj.containsKey("steering")) {
+    steering = obj["steering"];
+  } else if (obj.containsKey("width")) {
     width = obj["width"];
   } else if (obj.containsKey("angle")) {
     angle = obj["angle"];
@@ -61,7 +63,9 @@ Result::Result(JsonObject &obj) {
     roll = obj["roll"];
   }
 
-  if (obj.containsKey("height")) {
+  if (obj.containsKey("throttle")) {
+    throttle = obj["throttle"];
+  } else if (obj.containsKey("height")) {
     height = obj["height"];
   } else if (obj.containsKey("length")) {
     length = obj["length"];
