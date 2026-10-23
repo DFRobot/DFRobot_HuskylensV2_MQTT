@@ -178,7 +178,11 @@ Result *HuskylensV2_MQTT::getCachedIndexResultByID(eAlgorithm_t algo,
 }
 
 int16_t HuskylensV2_MQTT::getCachedResultMaxID(eAlgorithm_t algo) {
-  return maxID[toRealID(algo)];
+  const int cacheIndex = (int)toRealID(algo);
+  if (cacheIndex < 0 || cacheIndex >= ALGORITHM_BUILTIN_COUNT) {
+    return -1;
+  }
+  return maxID[cacheIndex];
 }
 
 Result *HuskylensV2_MQTT::getCurrentBranch(eAlgorithm_t algo) {
