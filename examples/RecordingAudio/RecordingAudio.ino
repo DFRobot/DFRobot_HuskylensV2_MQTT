@@ -51,7 +51,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   huskylens.begin("192.168.2.102", 1883, "huskylens", "dfrobot");
-  huskylens.switchAlgorithm(ALGORITHM_RECORDING_AUDIO);
+  huskylens.switchAlgorithm((eAlgorithm_t)(128));
   delay(5000);
 }
 

@@ -155,9 +155,9 @@ typedef enum {
   ALGORITHM_BARCODE_RECOGNITION,          // 17
   ALGORITHM_QRCODE_RECOGNITION,           // 18
   ALGORITHM_FALLDOWN_RECOGNITION,         // 19
-  ALGORITHM_RFU0,                         // 20
-  ALGORITHM_RFU1,                         // 21
-  ALGORITHM_RFU2,                         // 22
+  ALGORITHM_DEPTH_CAMERA,                 // 20
+  ALGORITHM_AUTO_DRIVE_SMART_TRAFFIC,     // 21
+  ALGORITHM_AUTO_DRIVE_CITY_ROADS,        // 22
   ALGORITHM_RFU3,                         // 23
   ALGORITHM_RFU4,                         // 24
 
@@ -169,10 +169,6 @@ typedef enum {
   ALGORITHM_CUSTOM_BEGIN = 128, // 128
 
 } eAlgorithm_t;
-
-// 自动驾驶内置模型，保留原预留枚举名称以兼容已有代码。
-#define ALGORITHM_AUTO_DRIVE_SMART_TRAFFIC ALGORITHM_RFU1
-#define ALGORITHM_AUTO_DRIVE_CITY_ROADS ALGORITHM_RFU2
 
 #ifdef LARGE_MEMORY
 #define ALGORITHM_COUNT ALGORITHM_BUILTIN_COUNT
