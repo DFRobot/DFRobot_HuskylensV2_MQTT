@@ -262,6 +262,65 @@ bool setMultiAlgorithm(eAlgorithm_t algo0, eAlgorithm_t algo1, eAlgorithm_t algo
 bool setMultiAlgorithm(eAlgorithm_t algo0, eAlgorithm_t algo1, eAlgorithm_t algo2 = ALGORITHM_ANY);
 ```
 
+### Agent 交互方法
+
+通过 MQTT 与二哈识图V2上运行的小智 agent 对话。与 UART 版本不同，prompt 和回答都不需要分片：每条内容都通过单条 MQTT 消息传输（请求发布到主题 `usr/cmd`，响应从主题 `usr/response` 接收）。
+
+建议的交互流程：调用 `sendAgentPrompt` 提交 prompt，轮询 `isAgentResponseReady`（或 `getAgentStatus`）直到回答就绪，最后用 `getAgentResponse` 取回完整回答。完整示例见 `examples/AgentPrompt_MQTT`。
+
+`sendAgentPrompt` 在发送前会按小智平台 listen/detect 的长度限制校验 prompt（与 DFRobot_HuskylensV2 库共用同一套 v5 实测标定模型）：先按 UTF-8 码点分类，汉字类（汉字/假名/中文标点）计 1、重型非 ASCII（emoji/全角/韩文等）计 1.5，得 `zh_eff = ceil(汉字类 + 1.5×重型)`；ASCII 侧字母/空格计 1、数字计 1.125、句号计 3、其他标点计 5，得 `en_eff`。`zh_eff > 16`、中文标点 ≥2 且汉字类 ≥15（或 ≥3 且 ≥14）、纯 ASCII `en_eff > 35`、或混合文本 `en_eff` 超出对应 `zh_eff` 的预算（含重型字符预算再减 1）都会被本地拒绝、不会发出；可用 `checkAgentPromptLength` / `canSendAgentPrompt` 预先校验。判定原则是宁可误拒、绝不误放。
+
+```cpp
+/**
+ * @fn sendAgentPrompt
+ * @brief 向 agent 发送文本 prompt；返回成功表示 prompt 已提交、agent 开始处理（不等待回答生成）。发送前先按小智 listen/detect 长度限制校验，超限会被本地拒绝
+ * @param prompt prompt 文本，非空，最大 4096 字节
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return prompt 被接受返回true，校验失败或发送失败返回false
+ */
+bool sendAgentPrompt(const String &prompt, eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn checkAgentPromptLength
+ * @brief 按小智 listen/detect 长度限制校验 prompt（v5 实测标定模型，UTF-8 感知：zh_eff = ceil(汉字类 + 1.5×重型非ASCII) ≤ 16，en_eff = 字母空格 + ceil(数字×1.125) + 3×句号 + 5×标点，纯 ASCII ≤ 35，混合按 zh_eff 查预算表）
+ * @param prompt 待校验的 prompt 文本
+ * @return AgentPromptLengthInfo_t，包含校验结果（AGENT_PROMPT_OK / AGENT_PROMPT_TOO_LONG）、zh_eff/en_eff 等效数和分类字符数
+ */
+AgentPromptLengthInfo_t checkAgentPromptLength(const String &prompt);
+
+/**
+ * @fn canSendAgentPrompt
+ * @brief checkAgentPromptLength 的便捷封装，供只需要布尔值的调用方使用
+ * @param prompt 待校验的 prompt 文本
+ * @return 校验结果为 AGENT_PROMPT_OK 时返回true
+ */
+bool canSendAgentPrompt(const String &prompt);
+
+/**
+ * @fn isAgentResponseReady
+ * @brief 查询 agent 是否有完整回答可以取回
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return 有完整回答返回true，否则返回false
+ */
+bool isAgentResponseReady(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentStatus
+ * @brief 获取 agent 当前状态
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return AGENT_IDLE、AGENT_PROCESSING、AGENT_BROADCASTING 或 AGENT_DISABLED；通信失败返回 AGENT_QUERY_FAILED
+ */
+eAgentStatus_t getAgentStatus(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentResponse
+ * @brief 取回完整回答（单条消息返回，无分片）
+ * @param agentType agent 类型（默认：eXIAOZHI_AGENT）
+ * @return 完整回答文本，失败返回空字符串
+ */
+String getAgentResponse(eAgentType_t agentType = eXIAOZHI_AGENT);
+```
+
 ## 算法
 
 二哈识图V2包含多种算法，每种算法在结果中产生不同的元素。

@@ -263,6 +263,65 @@ bool setMultiAlgorithm(eAlgorithm_t algo0, eAlgorithm_t algo1, eAlgorithm_t algo
 bool setMultiAlgorithmRatio(uint8_t ratio0, uint8_t ratio1, uint8_t ratio2 = 0);
 ```
 
+### Agent Interaction Methods
+
+Chat with the xiaozhi agent running on HuskyLens V2 over MQTT. Unlike the UART version, prompts and responses are not fragmented: each is transferred in a single MQTT message (requests are published to topic `usr/cmd`, responses are received on topic `usr/response`).
+
+Suggested flow: call `sendAgentPrompt`, poll `isAgentResponseReady` (or `getAgentStatus`) until the answer is ready, then fetch it with `getAgentResponse`. See `examples/AgentPrompt_MQTT` for a complete example.
+
+`sendAgentPrompt` validates the prompt against the xiaozhi platform's listen/detect length limit before sending (the same v5 calibrated model shared with the DFRobot_HuskylensV2 library): each UTF-8 code point is classified first — hanzi class (CJK/kana/CJK punctuation) x1, heavy non-ASCII (emoji/fullwidth/hangul/...) x1.5, giving `zh_eff = ceil(hanzi + 1.5*heavy)`; on the ASCII side letters/spaces x1, digits x1.125, '.' x3, other punctuation x5, giving `en_eff`. A prompt is rejected locally and not sent when `zh_eff > 16`, when there are 2+ CJK punctuation marks with 15+ hanzi-class chars (or 3+ with 14+), when pure-ASCII `en_eff > 35`, or when a mixed text's `en_eff` exceeds the budget for its `zh_eff` (budget minus 1 if heavy chars are present); use `checkAgentPromptLength` / `canSendAgentPrompt` to pre-check a prompt. The rule is conservative by design: it may over-reject but never over-accept.
+
+```cpp
+/**
+ * @fn sendAgentPrompt
+ * @brief Send a text prompt to the agent; success means the prompt was submitted and the agent started processing (does not wait for the answer). The prompt is validated against the xiaozhi listen/detect length limit first and is rejected locally when over the limit
+ * @param prompt The prompt text, must be non-empty and no larger than 4096 bytes
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return true if the prompt was accepted, false if validation or transmission failed
+ */
+bool sendAgentPrompt(const String &prompt, eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn checkAgentPromptLength
+ * @brief Check a prompt against the xiaozhi listen/detect length limit (v5 calibrated model, UTF-8 aware: zh_eff = ceil(hanzi class + 1.5*heavy non-ASCII) <= 16, en_eff = letters/spaces + ceil(digits*1.125) + 3*periods + 5*punct, pure ASCII <= 35, mixed texts budgeted per zh_eff)
+ * @param prompt The prompt text to check
+ * @return An AgentPromptLengthInfo_t holding the check result (AGENT_PROMPT_OK / AGENT_PROMPT_TOO_LONG), the zh_eff/en_eff equivalents, and the per-category character counts
+ */
+AgentPromptLengthInfo_t checkAgentPromptLength(const String &prompt);
+
+/**
+ * @fn canSendAgentPrompt
+ * @brief Convenience wrapper of checkAgentPromptLength for callers that only need a boolean
+ * @param prompt The prompt text to check
+ * @return true when the check result is AGENT_PROMPT_OK
+ */
+bool canSendAgentPrompt(const String &prompt);
+
+/**
+ * @fn isAgentResponseReady
+ * @brief Check whether the agent has a complete answer ready to fetch
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return true if a complete answer is ready, false otherwise
+ */
+bool isAgentResponseReady(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentStatus
+ * @brief Get the current agent status
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return AGENT_IDLE, AGENT_PROCESSING, AGENT_BROADCASTING or AGENT_DISABLED; AGENT_QUERY_FAILED on communication error
+ */
+eAgentStatus_t getAgentStatus(eAgentType_t agentType = eXIAOZHI_AGENT);
+
+/**
+ * @fn getAgentResponse
+ * @brief Fetch the complete answer (returned in one message, no fragmentation)
+ * @param agentType The agent type (default: eXIAOZHI_AGENT)
+ * @return The full response text, or an empty string on failure
+ */
+String getAgentResponse(eAgentType_t agentType = eXIAOZHI_AGENT);
+```
+
 ## Algorithm
 
 HuskyLens V2 incorporates multiple algorithms, each yielding distinct elements within the result.

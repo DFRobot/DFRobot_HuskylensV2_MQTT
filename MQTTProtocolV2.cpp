@@ -1,5 +1,6 @@
 #include "MQTTProtocolV2.h"
 #include "esp_idf_version.h" // check IDF version
+#include <XiaozhiTextCheck.h>
 #include <map>
 String server = "mqtt://192.168.2.102:1883";
 
@@ -43,7 +44,8 @@ void gbegin(String _host, uint16_t _port, String _username, String _password) {
   log_i("%s(): %d host: %s, port: %d, username: %s, password: %s", __func__,
         __LINE__, host.c_str(), port, username.c_str(), password.c_str());
   mqttClient.enableDebuggingMessages();
-  mqttClient.setMaxPacketSize(4096);
+  // agent 的 prompt/回答不分片，单条消息可能超过 4KB
+  mqttClient.setMaxPacketSize(8192);
   mqttClient.setURI(server.c_str(), username.c_str(), password.c_str());
   mqttClient.enableLastWillMessage("lwt", "I am going offline");
   mqttClient.setKeepAlive(30);
@@ -89,8 +91,13 @@ int8_t MQTTProtocolV2::getResult(eAlgorithm_t algo) {
     log_i("ret: %s", pret);
     const char *cmd = resp["cmd"];
     log_i("cmd: %s", cmd);
+    (void)cmd;
     if (strcmp(pret, "success") == 0) {
-      maxID[(int)algo] = resp["max_id"];
+      const int cacheIndex = (int)toRealID(algo);
+      if (cacheIndex < 0 || cacheIndex >= ALGORITHM_BUILTIN_COUNT) {
+        return false;
+      }
+      maxID[cacheIndex] = resp["max_id"];
       JsonArray &results = resp["results"];
       for (uint8_t i = 0; i < results.size(); i++) {
         JsonObject &item = results[i];
@@ -659,6 +666,241 @@ bool MQTTProtocolV2::stopRecording(eMediaType_t mediaType) {
   return isResponseSuccess(responsePayload);
 }
 
+bool MQTTProtocolV2::e2eStartRecording(void) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_start_recording";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::e2eStopRecording(void) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_stop_recording";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::e2eSendAnnotation(String annotation) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_send_annotation";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+  // menu 侧 doHttpE2eSendAnnotation 的 JSON 字段名未能实测确认
+  // (当前 online 版设备禁用 E2E 功能), 参照 protocol_uart 二进制->JSON
+  // 转换层仅有的候选字符串, 使用 "data"
+  root["data"] = annotation;
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+// 小智平台 listen/detect 文本长度校验（2026-10-20 约 300 组实测标定的
+// v5 模型，与 DFRobot_HuskylensV2 库行为一致）：先按 UTF-8 码点分类
+// （汉字类/重型非ASCII/字母空格/数字/句号/其他标点），再按加权等效数
+// （zh_eff = ceil(汉字类 + 1.5×重型), en_eff = 字母 + ceil(数字×1.125)
+// + 3×句号 + 5×标点）和混合预算表判定。宁可误拒，绝不误放。
+AgentPromptLengthInfo_t MQTTProtocolV2::checkAgentPromptLength(
+    const String &prompt) {
+  xiaozhi::MeasureResult m =
+      xiaozhi::measure(prompt.c_str(), prompt.length());
+  AgentPromptLengthInfo_t info = {xiaozhi::can_send(m) ? AGENT_PROMPT_OK
+                                                       : AGENT_PROMPT_TOO_LONG,
+                                  m.zh_eff, m.en_eff, m.hanzi,  m.heavy,
+                                  m.letter, m.digit,  m.period, m.punct,
+                                  m.cjk_punct};
+  return info;
+}
+
+bool MQTTProtocolV2::canSendAgentPrompt(const String &prompt) {
+  return xiaozhi::can_send(prompt.c_str(), prompt.length());
+}
+
+bool MQTTProtocolV2::sendAgentPrompt(const String &prompt,
+                                     eAgentType_t agentType) {
+  log_i("%s(): %d", __func__, __LINE__);
+  if (prompt.length() == 0) {
+    log_e("missing prompt");
+    return false;
+  }
+  if (prompt.length() > 4096) {
+    log_e("prompt too large: %d bytes", prompt.length());
+    return false;
+  }
+  // 仅小智平台有 listen/detect 长度限制, 发送前校验文本,
+  // 超限直接拒绝, 避免平台告警或静默丢弃(宁可误拒, 绝不误放)
+  if (eXIAOZHI_AGENT == agentType &&
+      !xiaozhi::can_send(prompt.c_str(), prompt.length())) {
+    log_e("prompt exceeds xiaozhi listen/detect length limit, rejected");
+    return false;
+  }
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "send_agent_prompt";
+  root["peer"] = "arduino";
+  root["agent_type"] = (uint8_t)agentType;
+  root["prompt"] = prompt;
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+eAgentStatus_t MQTTProtocolV2::getAgentStatus(eAgentType_t agentType) {
+  bool ret = false;
+  log_i("%s(): %d", __func__, __LINE__);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "get_agent_status";
+    root["peer"] = "arduino";
+    root["agent_type"] = (uint8_t)agentType;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+    log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  }
+  if (!ret) {
+    return AGENT_QUERY_FAILED;
+  }
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return AGENT_QUERY_FAILED;
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return AGENT_QUERY_FAILED;
+  }
+
+  String state = resp["state"].as<String>();
+  if (state.equals("processing")) {
+    return AGENT_PROCESSING;
+  } else if (state.equals("broadcasting")) {
+    return AGENT_BROADCASTING;
+  } else if (state.equals("disabled")) {
+    return AGENT_DISABLED;
+  } else if (!state.equals("idle")) {
+    log_w("unknown agent state: %s", state.c_str());
+  }
+  return AGENT_IDLE;
+}
+
+bool MQTTProtocolV2::isAgentResponseReady(eAgentType_t agentType) {
+  bool ret = false;
+  log_i("%s(): %d", __func__, __LINE__);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "is_agent_response_ready";
+    root["peer"] = "arduino";
+    root["agent_type"] = (uint8_t)agentType;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+    log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  }
+  if (!ret) {
+    return false;
+  }
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return false;
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return false;
+  }
+  return resp["ready"].as<bool>();
+}
+
+String MQTTProtocolV2::getAgentResponse(eAgentType_t agentType) {
+  bool ret = false;
+  log_i("%s(): %d", __func__, __LINE__);
+  {
+    DynamicJsonBuffer jsonBuffer;
+    JsonObject &root = jsonBuffer.createObject();
+    root["cmd"] = "get_agent_response";
+    root["peer"] = "arduino";
+    root["agent_type"] = (uint8_t)agentType;
+    root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+    String jsonStr;
+    root.printTo(jsonStr);
+    ret = sendAndWait(jsonStr);
+    log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  }
+  if (!ret) {
+    return "";
+  }
+
+  log_i("%s(): %d response: %s", __func__, __LINE__, responsePayload.c_str());
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &resp = jsonBuffer.parseObject(responsePayload.c_str());
+
+  if (!resp.success()) {
+    log_e("deserializeJson() failed");
+    return "";
+  }
+
+  if (!resp["ret"].as<String>().equals("success")) {
+    log_e("ret is not success , is %s", resp["ret"].as<String>().c_str());
+    return "";
+  }
+  return resp["response"].as<String>();
+}
+
 String MQTTProtocolV2::takePhoto(eResolution_t resolution) {
   bool ret = false;
   log_i("%s(): %d", __func__, __LINE__);
@@ -751,65 +993,6 @@ bool MQTTProtocolV2::isResponseSuccess(String &respStr) {
   }
   return true;
 }
-
-bool MQTTProtocolV2::e2eStartRecording(void) {
-  log_i("%s(): %d", __func__, __LINE__);
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject &root = jsonBuffer.createObject();
-  root["cmd"] = "e2e_start_recording";
-  root["peer"] = "arduino";
-  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
-
-  String jsonStr;
-  root.printTo(jsonStr);
-  bool ret = sendAndWait(jsonStr);
-  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
-
-  if (!ret) {
-    return false;
-  }
-  return isResponseSuccess(responsePayload);
-}
-
-bool MQTTProtocolV2::e2eStopRecording(void) {
-  log_i("%s(): %d", __func__, __LINE__);
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject &root = jsonBuffer.createObject();
-  root["cmd"] = "e2e_stop_recording";
-  root["peer"] = "arduino";
-  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
-
-  String jsonStr;
-  root.printTo(jsonStr);
-  bool ret = sendAndWait(jsonStr);
-  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
-
-  if (!ret) {
-    return false;
-  }
-  return isResponseSuccess(responsePayload);
-}
-
-bool MQTTProtocolV2::e2eSendAnnotation(String annotation) {
-  log_i("%s(): %d", __func__, __LINE__);
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject &root = jsonBuffer.createObject();
-  root["cmd"] = "e2e_send_annotation";
-  root["peer"] = "arduino";
-  root["data"] = annotation;
-  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
-
-  String jsonStr;
-  root.printTo(jsonStr);
-  bool ret = sendAndWait(jsonStr);
-  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
-
-  if (!ret) {
-    return false;
-  }
-  return isResponseSuccess(responsePayload);
-}
-
 
 void onMqttConnect(esp_mqtt_client_handle_t client) {
   log_i("%s(): %d", __func__, __LINE__);

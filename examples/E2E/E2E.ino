@@ -3,9 +3,13 @@
  <https://www.dfrobot.com/product-1922.html>
 
  This example demonstrates the E2E recording and annotation workflow of
- HUSKYLENS V2 via I2C interface. It initializes the sensor, starts an E2E
+ HUSKYLENS V2 via MQTT interface. It initializes the sensor, starts an E2E
  recording task, sends timestamped sample sensor annotation data, and then
  stops the recording task.
+
+ NOTE: E2E 功能在当前 online 版本设备固件上被禁用(设备返回
+ "e2e feature not available on online version"), 此例程用于 API 对齐,
+ 待设备固件开放 E2E 后即可使用。
  ***************************************************
  Created 2026-06-11
  By [thdyyl](yuanlong.yu@dfrobot.com)
@@ -18,7 +22,7 @@
 /***********Notice and Trouble shooting***************
  1.Connection and Diagram can be found here
  <https://wiki.dfrobot.com/HUSKYLENS_V1.0_SKU_SEN0305_SEN0336#target_23>
- 2.This code is tested on Arduino Uno, Leonardo, Mega, Microbit,ESP8266,ESP32
+ 2.This code is tested on Microbit,ESP8266,ESP32
  boards.
  ****************************************************/
 
@@ -28,20 +32,15 @@
 const char *ssid = "wanghui";
 const char *pass = "dfrobot2011";
 
+int sensor_data1, sensor_data2, sensor_data3;
+String annotation;
 HuskylensV2_MQTT huskylens;
 
-int sensor_data1,sensor_data2,sensor_data3;
-String annotation;
-
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(115200);
   delay(5000);
   Serial.println("setup, ESP.getSdkVersion(): ");
   Serial.println(ESP.getSdkVersion());
-  log_i();
-  log_i("setup, ESP.getSdkVersion(): ");
-  log_i("%s", ESP.getSdkVersion());
 
   WiFi.begin(ssid, pass);
   WiFi.setHostname("c3test");
@@ -55,7 +54,10 @@ void setup() {
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 
-  huskylens.begin("192.168.2.104", 1883, "huskylens", "dfrobot");
+  huskylens.begin("192.168.2.102", 1883, "huskylens", "dfrobot");
+
+  // 初始化随机种子
+  randomSeed(analogRead(A0));
 }
 
 void loop() {
