@@ -666,6 +666,64 @@ bool MQTTProtocolV2::stopRecording(eMediaType_t mediaType) {
   return isResponseSuccess(responsePayload);
 }
 
+bool MQTTProtocolV2::e2eStartRecording(void) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_start_recording";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::e2eStopRecording(void) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_stop_recording";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
+bool MQTTProtocolV2::e2eSendAnnotation(String annotation) {
+  log_i("%s(): %d", __func__, __LINE__);
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject &root = jsonBuffer.createObject();
+  root["cmd"] = "e2e_send_annotation";
+  root["peer"] = "arduino";
+  root["correlation_id"] = "arduino-mqtt-" + String(correlation_id++);
+  // menu 侧 doHttpE2eSendAnnotation 的 JSON 字段名未能实测确认
+  // (当前 online 版设备禁用 E2E 功能), 参照 protocol_uart 二进制->JSON
+  // 转换层仅有的候选字符串, 使用 "data"
+  root["data"] = annotation;
+
+  String jsonStr;
+  root.printTo(jsonStr);
+  bool ret = sendAndWait(jsonStr);
+  log_i("%s(): %d ret: %d", __func__, __LINE__, (int)ret);
+  if (!ret) {
+    return false;
+  }
+  return isResponseSuccess(responsePayload);
+}
+
 // 小智平台 listen/detect 文本长度校验（2026-10-20 约 300 组实测标定的
 // v5 模型，与 DFRobot_HuskylensV2 库行为一致）：先按 UTF-8 码点分类
 // （汉字类/重型非ASCII/字母空格/数字/句号/其他标点），再按加权等效数

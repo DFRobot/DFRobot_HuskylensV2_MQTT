@@ -62,6 +62,10 @@ public:
                       eResolution_t resolution = RESOLUTION_DEFAULT);
   bool stopRecording(eMediaType_t mediaType);
 
+  bool e2eStartRecording(void);
+  bool e2eStopRecording(void);
+  bool e2eSendAnnotation(String annotation);
+
   bool sendAgentPrompt(const String &prompt,
                        eAgentType_t agentType = eXIAOZHI_AGENT);
   String getAgentResponse(eAgentType_t agentType = eXIAOZHI_AGENT);
