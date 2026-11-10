@@ -91,6 +91,7 @@ int8_t MQTTProtocolV2::getResult(eAlgorithm_t algo) {
     log_i("ret: %s", pret);
     const char *cmd = resp["cmd"];
     log_i("cmd: %s", cmd);
+    (void)cmd;
     if (strcmp(pret, "success") == 0) {
       const int cacheIndex = (int)toRealID(algo);
       if (cacheIndex < 0 || cacheIndex >= ALGORITHM_BUILTIN_COUNT) {

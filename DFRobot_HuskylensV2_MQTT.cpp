@@ -187,12 +187,12 @@ int16_t HuskylensV2_MQTT::getCachedResultMaxID(eAlgorithm_t algo) {
 
 Result *HuskylensV2_MQTT::getCurrentBranch(eAlgorithm_t algo) {
   DBG("\n");
-  Result *rlt = NULL;
   algo = toRealID(algo);
 
   if (result[algo][0] && (result[algo][0]->level == 1)) {
     return result[algo][0];
   }
+  return NULL;
 }
 
 int8_t HuskylensV2_MQTT::getUpcomingBranchCount(eAlgorithm_t algo) {
